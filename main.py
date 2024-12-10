@@ -2,6 +2,7 @@ import cv2, mediapipe as mp, math, time
 from djitellopy import Tello
 import threading
 from queue import Queue
+import time
 
 
 class Frontend(object):
@@ -14,13 +15,15 @@ class Frontend(object):
         self.drone_thread = threading.Thread(target=self.drone_action_worker)
         self.drone_thread.start()
         self.tl = Tello()
+        self.time_gesture_hold = 3
+        self.time_start_time = 0
 
     def run(self):
         self.tl.connect()
         self.tl.streamon()
-        # cap = self.cv.VideoCapture(self.tl.get_udp_video_address())
+        cap = self.cv.VideoCapture(self.tl.get_udp_video_address())
         cap = self.cv.VideoCapture(0)
-        
+
         with self.mp_hands.Hands(
             static_image_mode=False,
             max_num_hands=1,
@@ -37,11 +40,11 @@ class Frontend(object):
                 image = self.cv.cvtColor(frame, self.cv.COLOR_BGR2RGB)
 
                 # detections
-                # image.flags.writeable = False
+                image.flags.writeable = False
 
                 # set flag true
                 results = hands.process(image)
-                # image.flags.writeable = True
+                image.flags.writeable = True
 
                 # # recolor
                 # image = self.cv.cvtColor(image, self.cv.COLOR_BGR2RGB)
@@ -50,9 +53,8 @@ class Frontend(object):
                 x= horizontal
                 y= vertical
                 z= depth
-                
                 """
-
+                
                 if results.multi_hand_landmarks:
                     for hand_landmarks in results.multi_hand_landmarks:
                         self.mp_drawing.draw_landmarks(
@@ -65,33 +67,35 @@ class Frontend(object):
 
                         gesture = self.reconocerGestos(landmarks)
 
-                    if gesture == "thumb_up":
-                        self.printGestureOutput(gesture, frame)
-                        self.drone_action_queue.put("takeoff")
-                    elif gesture == "ok":
-                        self.printGestureOutput(gesture, frame)
-                        self.drone_action_queue.put("land")
-                    elif gesture == "index_up":
-                        self.printGestureOutput(gesture, frame)
-                        self.drone_action_queue.put("up")
-                    elif gesture == "index_down":
-                        self.printGestureOutput(gesture, frame)
-                        self.drone_action_queue.put("down")
-                    elif gesture == "index_right":
-                        self.printGestureOutput(gesture, frame)
-                        self.drone_action_queue.put("right")
-                    elif gesture == "index_left":
-                        self.printGestureOutput(gesture, frame)
-                        self.drone_action_queue.put("left")
-                    elif gesture == "palm":
-                        self.printGestureOutput(gesture, frame)
-                        self.drone_action_queue.put("forward")
-                    elif gesture == "rock":
-                        self.printGestureOutput(gesture, frame)
-                        self.drone_action_queue.put("back")
-                    elif gesture =="":
-                        self.printGestureOutput(gesture, frame)
-                        self.drone_action_queue.put(None)
+                        
+                        if gesture == "thumb_up":
+                            self.printGestureOutput(gesture, frame)
+                            self.drone_action_queue.put("takeoff")
+                        elif gesture == "ok":
+                            self.printGestureOutput(gesture, frame)
+                            self.drone_action_queue.put("land")
+                            pass
+                        elif gesture == "index_up":
+                            self.printGestureOutput(gesture, frame)
+                            # self.drone_action_queue.put("up")
+                        elif gesture == "index_down":
+                            self.printGestureOutput(gesture, frame)
+                            # self.drone_action_queue.put("down")
+                        elif gesture == "index_right":
+                            self.printGestureOutput(gesture, frame)
+                            # self.drone_action_queue.put("right")
+                        elif gesture == "index_left":
+                            self.printGestureOutput(gesture, frame)
+                            # self.drone_action_queue.put("left")
+                        elif gesture == "palm":
+                            self.printGestureOutput(gesture, frame)
+                            # self.drone_action_queue.put("forward")
+                        elif gesture == "rock":
+                            self.printGestureOutput(gesture, frame)
+                            # self.drone_action_queue.put("back")
+                        elif gesture == "":
+                            self.printGestureOutput(gesture, frame)
+                            # self.drone_action_queue.put(None)
                         
 
                     for num, hand in enumerate(results.multi_hand_landmarks):
@@ -165,7 +169,8 @@ class Frontend(object):
         # )
 
         is_ok = (
-            self.distance(pulgar04, indice04) <= 0.03 and self.distance(pulgar04, medio04) >0.05
+            self.distance(pulgar04, indice04) <= 0.03
+            and self.distance(pulgar04, medio04) > 0.05
             # and all(
             #     landmarks[base][1] > landmarks[punta][1]
             #     for base, punta in [(9, 12), (13, 16), (17, 20)]
@@ -181,68 +186,58 @@ class Frontend(object):
             and pulgar01[1] > pulgar04[1]
         )
 
-        is_index_up= (
-            munieca[1]>
-            indice02[1]>indice04[1]
+        is_index_up = (
+            munieca[1] > indice02[1] > indice04[1]
             and
-            #medio to meñique
+            # medio to meñique
             all(
-                landmarks[base][1]< landmarks[punta][1]
-                for base, punta in [(9,12), (13, 16), (17, 20)]
+                landmarks[base][1] < landmarks[punta][1]
+                for base, punta in [(9, 12), (13, 16), (17, 20)]
             )
             # or
             # pulgar02[1]<pulgar04[1]
-            
         )
-        is_index_down= (
-            munieca[1]<
-            (indice02[1]<indice04[1])
+        is_index_down = (
+            munieca[1] < (indice02[1] < indice04[1])
             and
-            #medio to meñique
+            # medio to meñique
             all(
-                landmarks[base][1]< landmarks[punta][1]
-                for base, punta in [(9,12), (13, 16), (17, 20)]
+                landmarks[base][1] < landmarks[punta][1]
+                for base, punta in [(9, 12), (13, 16), (17, 20)]
             )
             # or
             # pulgar02[1]<pulgar04[1]
-            
         )
-        
-        is_index_right=(
-            indice04[0]>indice02[0]
-            and
-            (all (
-                landmarks[base][1]<landmarks[punta][1]
-                for base, punta in [(2,4), (10,12), (14,16), (18,20)]
-            ))
+
+        is_index_right = indice04[0] > indice02[0] and (
+            all(
+                landmarks[base][1] < landmarks[punta][1]
+                for base, punta in [(2, 4), (10, 12), (14, 16), (18, 20)]
+            )
         )
-        
-        is_index_left=(
-            indice04[0]<indice02[0]
-            and
-            (all (
-                landmarks[base][1]<landmarks[punta][1]
-                for base, punta in [(2,4), (10,12), (14,16), (18,20)]
-            ))
+
+        is_index_left = indice04[0] < indice02[0] and (
+            all(
+                landmarks[base][1] < landmarks[punta][1]
+                for base, punta in [(2, 4), (10, 12), (14, 16), (18, 20)]
+            )
         )
-        
-        is_palm = ( 
-            all(landmarks[base][1]>landmarks[punta][1]
-                for base, punta in [(1,4), (5,8), (9,12), (13,16), (17,20)])           
+
+        is_palm = all(
+            landmarks[base][1] > landmarks[punta][1]
+            for base, punta in [(1, 4), (5, 8), (9, 12), (13, 16), (17, 20)]
         )
-        
-        is_rock= (
-            indice02[1]>indice04[1]
-            and
-            meniique02[1]>meniique04[1]
-            
-            and
-            (all(
-                landmarks[base][1]<landmarks[punta][1]
-                for base, punta in [(10,12), (14,16)]
-            ))
-            and
-            pulgar01[1]>pulgar04[1]
+
+        is_rock = (
+            indice02[1] > indice04[1]
+            and meniique02[1] > meniique04[1]
+            and (
+                all(
+                    landmarks[base][1] < landmarks[punta][1]
+                    for base, punta in [(10, 12), (14, 16)]
+                )
+            )
+            and pulgar01[1] > pulgar04[1]
         )
         """
         0: Base de la palma (wrist, muñeca).
@@ -253,28 +248,28 @@ class Frontend(object):
         17-20: Meñique.
         """
 
-        #land
+        # land
         if is_ok:
             return "ok"
-        #takeoff
+        # takeoff
         elif is_thumb_up:
             return "thumb_up"
-        #rotate right
+        # rotate right
         elif is_index_right:
             return "index_right"
-        #rotate left
+        # rotate left
         elif is_index_left:
             return "index_left"
-        #move up
+        # move up
         elif is_index_up:
             return "index_up"
-        #move down
+        # move down
         elif is_index_down:
             return "index_down"
-        #move forward
+        # move forward
         elif is_palm:
             return "palm"
-        #move back
+        # move back
         elif is_rock:
             return "rock"
         else:
@@ -304,68 +299,73 @@ class Frontend(object):
                 (0, 0, 255),
                 2,
             )
+
     """
     
         to-do: que capture el gesto solo una vez Y
         que ese gesto sea detectado dentro de un plazo de 1 a 2 segundos
         
     """
+
     def drone_action_worker(self):
-        gesture_detected= False
+        gesture_detected = False
         while True:
             action = self.drone_action_queue.get()
             if action is None:  # Señal para terminar el hilo
                 break
             try:
+                pass
                 if action == "takeoff":
-                    """if not gesture_detected: 
+                    if not gesture_detected:
                         self.tl.takeoff()
                         # print("al vuelo")
-                        gesture_detected= True"""
+                        gesture_detected= True
                 elif action == "land":
-                    """if not gesture_detected: 
+                    if not gesture_detected:
                         self.tl.land()
                         # print("al vuelo")
-                        gesture_detected= True"""
+                        gesture_detected= True
                 elif action == "up":
-                    """if not gesture_detected: 
+                    if not gesture_detected:
                         self.tl.move_up(20)
                         # print("al vuelo")
-                        gesture_detected= True"""
+                        gesture_detected= True
                 elif action == "down":
-                    """if not gesture_detected: 
+                    if not gesture_detected:
                         self.tl.move_down(20)
                         # print("al vuelo")
-                        gesture_detected= True"""
+                        gesture_detected= True
                 elif action == "right":
-                    """if not gesture_detected: 
+                    if not gesture_detected:
                         self.tl.rotate_clockwise(45)
                         # print("al vuelo")
-                        gesture_detected= True"""
+                        gesture_detected= True
                 elif action == "left":
-                    """if not gesture_detected: 
+                    if not gesture_detected:
                         self.tl.rotate_counter_clockwise(45)
                         # print("al vuelo")
-                        gesture_detected= True"""
+                        gesture_detected= True
                 elif action == "forward":
-                    """if not gesture_detected: 
+                    if not gesture_detected:
                         self.tl.move_forward(20)
                         # print("al vuelo")
-                        gesture_detected= True"""
+                        gesture_detected= True
                 elif action == "back":
-                    """if not gesture_detected: 
+                    if not gesture_detected:
                         self.tl.move_back(20)
                         # print("al vuelo")
-                        gesture_detected= True"""
-                    
+                        gesture_detected= True
+
             except Exception as e:
                 print(f"Error ejecutando acción '{action}': {e}")
                 pass
             self.drone_action_queue.task_done()
 
+
 def main():
     fend = Frontend()
     fend.run()
+
 
 if __name__ == "__main__":
     main()
